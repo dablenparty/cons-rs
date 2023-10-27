@@ -122,7 +122,7 @@ macro_rules! cons {
         let $hd = iter.next().unwrap_or_else(|| {
             panic!("Iterator exhausted before reaching variable {}", stringify!($hd));
         });
-        cons!(iter => $($tl)::+);
+        $crate::cons!(iter => $($tl)::+);
     };
 }
 
