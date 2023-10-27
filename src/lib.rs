@@ -69,13 +69,25 @@
 /// `String`s, but `x` and `y` are `&str` slices and `zs` is
 /// a `Vec<&str>`.
 ///
-/// It is important to note that the macro does _not_ support
-/// destructuring. For example:
+/// The macro also supports destructuring by wrapping the pattern
+/// in parentheses:
 ///
-/// ```rust,compile_fail
+/// ```rust
 /// # use cons::cons;
-/// let v = [(1, 2), (3, 4)];
-/// cons!(v => (x, y)::zs); // compile error
+/// let tuples = [(1, 2), (3, 4), (5, 6)];
+/// cons!(tuples => ((x, y))::zs);
+/// assert_eq!(x, 1);
+/// assert_eq!(y, 2);
+/// assert_eq!(zs, vec![(3, 4), (5, 6)]);
+///
+/// # #[derive(Debug, PartialEq, Eq)]
+/// struct Point(i32, i32);
+///
+/// let points = [Point(1, 2), Point(3, 4), Point(5, 6)];
+/// cons!(points => (Point(x, y))::zs);
+/// assert_eq!(x, 1);
+/// assert_eq!(y, 2);
+/// assert_eq!(zs, vec![Point(3, 4), Point(5, 6)]);
 /// ```
 ///
 /// # Panics
@@ -101,28 +113,32 @@
 /// ```
 #[macro_export]
 macro_rules! cons {
-    // base case 1
-    ($iter:expr => $hd:ident::nil) => {
+    ($iter:expr => $hd:ident :: nil) => {
+        $crate::cons!($iter => ($hd)::nil);
+    };
+    ($iter:expr => ($hd:pat) :: nil) => {
         let mut iter = $iter.into_iter();
         let $hd = iter.next().unwrap_or_else(|| {
             panic!("Iterator exhausted before reaching variable {}", stringify!($hd));
         });
         {
-            let rest = iter.collect::<Vec<_>>();
-            assert!(rest.is_empty(), "Found `nil` in cons but iterator is not empty ({rest:?})\nConsider removing `::nil`");
+            let rest = iter.count();
+            assert_eq!(rest, 0, "Found `nil` in cons but iterator is not empty ({rest} elements left)\nConsider removing `::nil`");
         }
     };
-    // base case 2
     ($iter:expr => $hd:ident) => {
         let iter = $iter.into_iter();
         let $hd = iter.collect::<Vec<_>>();
     };
-    ($iter:expr => $hd:ident$(::$tl:ident)+) => {
+    ($iter:expr => $hd:ident :: $($rest:tt)+) => {
+        $crate::cons!($iter => ($hd) :: $($rest)+);
+    };
+    ($iter:expr => ($hd:pat) :: $($rest:tt)+) => {
         let mut iter = $iter.into_iter();
         let $hd = iter.next().unwrap_or_else(|| {
             panic!("Iterator exhausted before reaching variable {}", stringify!($hd));
         });
-        $crate::cons!(iter => $($tl)::+);
+        $crate::cons!(iter => $($rest)+);
     };
 }
 
@@ -150,6 +166,15 @@ mod tests {
     }
 
     #[test]
+    fn test_destructure_inline() {
+        let v = [(1, 2), (3, 4)];
+        cons!(v => ((x, y))::zs);
+        assert_eq!(x, 1);
+        assert_eq!(y, 2);
+        assert_eq!(zs, vec![(3, 4)]);
+    }
+
+    #[test]
     #[should_panic(expected = "Iterator exhausted before reaching variable y")]
     #[allow(unused_variables)]
     fn test_iterator_too_short() {
@@ -159,7 +184,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "Found `nil` in cons but iterator is not empty ([2])\nConsider removing `::nil`"
+        expected = "Found `nil` in cons but iterator is not empty (1 elements left)\nConsider removing `::nil`"
     )]
     #[allow(unused_variables)]
     fn test_iterator_too_long() {
