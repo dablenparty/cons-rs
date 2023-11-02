@@ -1,3 +1,8 @@
+/*!
+This crate attempts to bring the "cons" feature from SML into Rust.
+See the [`cons!`] macro for more information.
+*/
+
 /// Brings the "cons" feature from SML into Rust. I'm not the most
 /// experienced with SML so this most likely will not be feature
 /// complete. This is more of an experiment than anything else.
